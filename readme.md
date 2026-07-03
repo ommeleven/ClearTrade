@@ -2,8 +2,6 @@
 
 A production-style fintech backend built with ASP.NET Core 8, demonstrating the architecture, patterns, and operational concerns of a real brokerage platform backend.
 
-[![CI/CD](https://github.com/YOUR_USERNAME/BrokerageApi/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/YOUR_USERNAME/BrokerageApi/actions/workflows/ci-cd.yml)
-
 ---
 
 ## Overview
