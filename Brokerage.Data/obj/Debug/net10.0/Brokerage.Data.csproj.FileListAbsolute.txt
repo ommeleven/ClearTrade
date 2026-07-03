@@ -1,0 +1,16 @@
+/Users/HP/src/c#/BrokerageSolution/Brokerage.Data/bin/Debug/net10.0/Brokerage.Data.deps.json
+/Users/HP/src/c#/BrokerageSolution/Brokerage.Data/bin/Debug/net10.0/Brokerage.Data.dll
+/Users/HP/src/c#/BrokerageSolution/Brokerage.Data/bin/Debug/net10.0/Brokerage.Data.pdb
+/Users/HP/src/c#/BrokerageSolution/Brokerage.Data/bin/Debug/net10.0/Brokerage.Core.dll
+/Users/HP/src/c#/BrokerageSolution/Brokerage.Data/bin/Debug/net10.0/Brokerage.Core.pdb
+/Users/HP/src/c#/BrokerageSolution/Brokerage.Data/obj/Debug/net10.0/Brokerage.Data.csproj.AssemblyReference.cache
+/Users/HP/src/c#/BrokerageSolution/Brokerage.Data/obj/Debug/net10.0/Brokerage.Data.GeneratedMSBuildEditorConfig.editorconfig
+/Users/HP/src/c#/BrokerageSolution/Brokerage.Data/obj/Debug/net10.0/Brokerage.Data.AssemblyInfoInputs.cache
+/Users/HP/src/c#/BrokerageSolution/Brokerage.Data/obj/Debug/net10.0/Brokerage.Data.AssemblyInfo.cs
+/Users/HP/src/c#/BrokerageSolution/Brokerage.Data/obj/Debug/net10.0/Brokerage.Data.csproj.CoreCompileInputs.cache
+/Users/HP/src/c#/BrokerageSolution/Brokerage.Data/obj/Debug/net10.0/Brokerage.Data.sourcelink.json
+/Users/HP/src/c#/BrokerageSolution/Brokerage.Data/obj/Debug/net10.0/Brokerag.30C90ECA.Up2Date
+/Users/HP/src/c#/BrokerageSolution/Brokerage.Data/obj/Debug/net10.0/Brokerage.Data.dll
+/Users/HP/src/c#/BrokerageSolution/Brokerage.Data/obj/Debug/net10.0/refint/Brokerage.Data.dll
+/Users/HP/src/c#/BrokerageSolution/Brokerage.Data/obj/Debug/net10.0/Brokerage.Data.pdb
+/Users/HP/src/c#/BrokerageSolution/Brokerage.Data/obj/Debug/net10.0/ref/Brokerage.Data.dll

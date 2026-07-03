@@ -1,0 +1,12 @@
+/Users/HP/src/c#/BrokerageSolution/Brokerage.Core/bin/Debug/net10.0/Brokerage.Core.deps.json
+/Users/HP/src/c#/BrokerageSolution/Brokerage.Core/bin/Debug/net10.0/Brokerage.Core.dll
+/Users/HP/src/c#/BrokerageSolution/Brokerage.Core/bin/Debug/net10.0/Brokerage.Core.pdb
+/Users/HP/src/c#/BrokerageSolution/Brokerage.Core/obj/Debug/net10.0/Brokerage.Core.GeneratedMSBuildEditorConfig.editorconfig
+/Users/HP/src/c#/BrokerageSolution/Brokerage.Core/obj/Debug/net10.0/Brokerage.Core.AssemblyInfoInputs.cache
+/Users/HP/src/c#/BrokerageSolution/Brokerage.Core/obj/Debug/net10.0/Brokerage.Core.AssemblyInfo.cs
+/Users/HP/src/c#/BrokerageSolution/Brokerage.Core/obj/Debug/net10.0/Brokerage.Core.csproj.CoreCompileInputs.cache
+/Users/HP/src/c#/BrokerageSolution/Brokerage.Core/obj/Debug/net10.0/Brokerage.Core.sourcelink.json
+/Users/HP/src/c#/BrokerageSolution/Brokerage.Core/obj/Debug/net10.0/Brokerage.Core.dll
+/Users/HP/src/c#/BrokerageSolution/Brokerage.Core/obj/Debug/net10.0/refint/Brokerage.Core.dll
+/Users/HP/src/c#/BrokerageSolution/Brokerage.Core/obj/Debug/net10.0/Brokerage.Core.pdb
+/Users/HP/src/c#/BrokerageSolution/Brokerage.Core/obj/Debug/net10.0/ref/Brokerage.Core.dll

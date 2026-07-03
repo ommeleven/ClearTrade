@@ -1,0 +1,56 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "Brokerage.Services/1.0.0": {
+        "dependencies": {
+          "Brokerage.Core": "1.0.0",
+          "Brokerage.Data": "1.0.0"
+        },
+        "runtime": {
+          "Brokerage.Services.dll": {}
+        }
+      },
+      "Brokerage.Core/1.0.0": {
+        "runtime": {
+          "Brokerage.Core.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "Brokerage.Data/1.0.0": {
+        "dependencies": {
+          "Brokerage.Core": "1.0.0"
+        },
+        "runtime": {
+          "Brokerage.Data.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "Brokerage.Services/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Brokerage.Core/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Brokerage.Data/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}
