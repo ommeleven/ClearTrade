@@ -6,24 +6,26 @@ namespace Brokerage.Services;
 
 public class AccountService
 {
-    private readonly AccountStore _store;
+    private readonly AccountStore _repo;
 
-    public AccountService(AccountStore store)
+    public AccountService(AccountStore repo)
     {
-        _store = store;
+        _repo = repo;
 
     }
-    public IEnumerable<Account> GetAllAccounts() => _store.GetAll();
+    public IEnumerable<Account> GetAllAccounts() => _repo.GetAll();
+
+    public Account?  GetAccount(string id) => _repo.GetById(id);
 
     public Account Deposit(string accountId, decimal amount)
     {
         if (amount <= 0) throw new ArgumentException("Deposit amount must be positive.");
 
-        var account = _store.GetById(accountId) ?? 
+        var account = _repo.GetById(accountId) ?? 
         throw new InvalidOperationException($"Account not found for the account ID: {accountId} ");
         
         account.Balance += amount;
-        _store.Update(account);
+        _repo.Update(account);
         return account;
     }
 
@@ -31,12 +33,12 @@ public class AccountService
     {
          if (amount <= 0) throw new ArgumentException("Withdrawal amount must be positive.");
          
-         var account = _store.GetById(accountId) ??
+         var account = _repo.GetById(accountId) ??
          throw new InvalidOperationException($"Account not found for the account ID: {accountId} ");
 
         if (amount > account.Balance) throw new InvalidOperationException("Insufficient funds.");
         account.Balance -= amount;
-        _store.Update(account);
+        _repo.Update(account);
         return account; 
 
        
