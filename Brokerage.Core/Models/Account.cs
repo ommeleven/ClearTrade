@@ -1,9 +1,9 @@
 namespace Brokerage.Core.Models;
 
-public class Account
+public class Account : IEntity
 {
-    public string Id { get; set; }
-    public string OwnerName { get;  set; }
+    public string Id { get; set; } = "" ;
+    public string OwnerName { get;  set; } = "" ;
     public decimal Balance { get;  set; }
     public bool isOverDrawn => Balance < 0;
     

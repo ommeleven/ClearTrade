@@ -1,9 +1,8 @@
 using Brokerage.Core.Models;
-using Brokerage.Core.Interfaces;
 
 namespace Brokerage.Data;
 
-public class AccountStore : IAccountRepository 
+public class AccountStore
 {
     private readonly List<Account> _accounts = new()
     {

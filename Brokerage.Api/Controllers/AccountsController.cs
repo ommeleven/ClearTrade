@@ -16,25 +16,28 @@ public class AccountsController : ControllerBase
     }
 
     [HttpGet]
-    public IEnumerable<Account> GetAll() => _service.GetAllAccounts();
+    public async Task<IEnumerable<Account>> GetAll()
+    {
+      return await _service.GetAllAccounts();   
+    }
 
     [HttpGet("{id}")]
-    public ActionResult<Account> GetById(string id)
+    public async Task<ActionResult<Account>> GetById(string id)
     {
-        var accounts = _service.GetAllAccounts();
+        var accounts = await _service.GetAllAccounts();
         var account = accounts.FirstOrDefault(a => a.Id == id);
         return account is null ? NotFound() : Ok(account); 
     }
 
     [HttpPost("{id}/deposit")]
-    public ActionResult<Account> Deposit(string id, [FromBody] decimal amount)
+    public async Task<ActionResult<Account>> Deposit(string id, [FromBody] decimal amount)
     {
-        try {return Ok(_service.Deposit(id, amount)); }
+        try {return Ok(await _service.Deposit(id, amount)); }
         catch (Exception ex) { return BadRequest(ex.Message); }
     }
 
     [HttpPost("{id}/withdraw")]
-    public ActionResult<Account> Withdraw(string id, [FromBody] decimal amount)
+    public async Task<ActionResult<Account>> Withdraw(string id, [FromBody] decimal amount)
     {
         try { return Ok(_service.Withdraw(id, amount)); }
         catch (Exception ex) { return BadRequest(ex.Message); }

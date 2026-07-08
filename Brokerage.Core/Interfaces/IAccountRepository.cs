@@ -4,8 +4,8 @@ namespace Brokerage.Core.Interfaces;
 
 public interface IAccountRepository
 {
-    IEnumerable<Account> GetAll();
-    Account? GetById(string id);
-    void Add(Account account);
-    void Update(Account account);
+    Task<T> GetAll();
+    Task GetById(string id);
+    Task Add(Account account);
+    Task Update(Account account);
 }

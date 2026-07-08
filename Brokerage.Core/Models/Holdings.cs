@@ -1,6 +1,6 @@
 namespace Brokerage.Core.Models;
 
-public class Holdng
+public class Holdng : IEntity
 {
     public string Id { get; set; }
     public string AccountId { get; set; }

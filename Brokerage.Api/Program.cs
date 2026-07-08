@@ -11,7 +11,9 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-builder.Services.AddSingleton<AccountStore>();
+builder.Services.AddSingleton<IAccountRepository, AccountStore>();
+builder.Services.AddSingleton<IPriceFeed, StubPriceFeed>();
+builder.Services.AddSingleton(typeof(IRepository<>), typeof(InMemmoryRepository<>));
 builder.Services.AddScoped<AccountService>();
 
 var app = builder.Build();
