@@ -39,7 +39,7 @@ public class AccountsController : ControllerBase
     [HttpPost("{id}/withdraw")]
     public async Task<ActionResult<Account>> Withdraw(string id, [FromBody] decimal amount)
     {
-        try { return Ok(_service.Withdraw(id, amount)); }
+        try { return Ok(await _service.Withdraw(id, amount)); }
         catch (Exception ex) { return BadRequest(ex.Message); }
     }
 
