@@ -1,4 +1,5 @@
-# BrokerageApi
+# ClearTrade
+
 
 A production-style fintech backend built with ASP.NET Core 8, demonstrating the architecture, patterns, and operational concerns of a real brokerage platform backend.
 
@@ -6,7 +7,7 @@ A production-style fintech backend built with ASP.NET Core 8, demonstrating the 
 
 ## Overview
 
-BrokerageApi is a RESTful API that manages investment **accounts**, **holdings** (positions a client owns), and **trades** (buy/sell orders). It is deployed as a containerized service on Azure Container Apps, backed by a managed PostgreSQL database, and shipped via an automated CI/CD pipeline.
+ClearTrade is a RESTful API that manages investment **accounts**, **holdings** (positions a client owns), and **trades** (buy/sell orders). It is deployed as a containerized service on Azure Container Apps, backed by a managed PostgreSQL database, and shipped via an automated CI/CD pipeline.
 
 The project was built to demonstrate N-tier architecture, dependency injection, generic data access, JWT authentication, structured logging, rate limiting, background jobs, and distributed caching — the full stack of concerns a backend engineer handles in production.
 
