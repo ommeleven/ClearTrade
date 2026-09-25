@@ -8,14 +8,15 @@
 #   (or put DATABASE_URL=... in .azure-secrets.env, which is git-ignored)
 #   ./scripts/provision.sh
 #
-# Optional env: LOCATION (default eastus), RG (default rg-cleartrade), IMAGE, GITHUB_REPO, BUDGET_EMAIL
+# Optional env: EXPECTED_SUBSCRIPTION (default "Azure for Students"), LOCATION (default centralus), RG (default rg-cleartrade), IMAGE, GITHUB_REPO, BUDGET_EMAIL
 set -euo pipefail
 
-LOCATION="${LOCATION:-eastus}"
+LOCATION="${LOCATION:-centralus}"
 RG="${RG:-rg-cleartrade}"
 GITHUB_REPO="${GITHUB_REPO:-ommeleven/ClearTrade}"
 IMAGE="${IMAGE:-ghcr.io/ommeleven/cleartrade-api:latest}"
 BLOCKED_DOMAIN="perccent.com"
+EXPECTED_SUBSCRIPTION="${EXPECTED_SUBSCRIPTION:-Azure for Students}"   # refuse to touch any other subscription
 SECRETS_FILE="$(dirname "$0")/../.azure-secrets.env"   # git-ignored; keeps generated secrets stable across runs
 
 say() { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
@@ -32,6 +33,7 @@ TENANT_ID="$(az account show --query tenantId -o tsv)"
 if [[ "$(printf %s "$ACCOUNT_USER" | tr "[:upper:]" "[:lower:]")" == *"@${BLOCKED_DOMAIN}" ]]; then
   die "Signed in as ${ACCOUNT_USER}. This project must not use ${BLOCKED_DOMAIN} cloud resources. Run 'az logout' and 'az login' with your personal account."
 fi
+[[ "$SUBSCRIPTION_NAME" == "$EXPECTED_SUBSCRIPTION" ]] || die "Active subscription is '${SUBSCRIPTION_NAME}', expected '${EXPECTED_SUBSCRIPTION}'. Run: az account set -s \"${EXPECTED_SUBSCRIPTION}\""
 say "Using subscription '${SUBSCRIPTION_NAME}' (${SUBSCRIPTION_ID}) as ${ACCOUNT_USER}"
 BUDGET_EMAIL="${BUDGET_EMAIL:-$ACCOUNT_USER}"
 
@@ -87,28 +89,13 @@ az group create -n "$RG" -l "$LOCATION" --tags project=cleartrade cost=free-tier
 OUTPUTS="$(az deployment group create -g "$RG" -n cleartrade --template-file "$(dirname "$0")/../infra/main.bicep" \
   --parameters image="$IMAGE" jwtKey="$JWT_KEY" adminPassword="$ADMIN_PASSWORD" \
                databaseConnectionString="$DB_CONNECTION" budgetAlertEmail="$BUDGET_EMAIL" \
-               budgetStartDate="$(date -u +%Y-%m-01)" \
+               budgetStartDate="$(date -u +%Y-%m-01)" githubRepo="$GITHUB_REPO" \
   --query properties.outputs -o json)"
 URL="$(echo "$OUTPUTS" | python3 -c 'import sys,json;print(json.load(sys.stdin)["url"]["value"])')"
 APP_NAME="$(echo "$OUTPUTS" | python3 -c 'import sys,json;print(json.load(sys.stdin)["containerAppName"]["value"])')"
 
-# --- 5. GitHub Actions -> Azure via OIDC (no stored cloud credentials) ---------------------------
-say "Configuring GitHub OIDC deploy identity"
-APP_ID="$(az ad app list --display-name cleartrade-github-deploy --query '[0].appId' -o tsv)"
-if [[ -z "$APP_ID" ]]; then
-  APP_ID="$(az ad app create --display-name cleartrade-github-deploy --query appId -o tsv)"
-fi
-az ad sp show --id "$APP_ID" -o none 2>/dev/null || az ad sp create --id "$APP_ID" -o none
-if ! az ad app federated-credential list --id "$APP_ID" --query "[?name=='github-main']" -o tsv | grep -q .; then
-  az ad app federated-credential create --id "$APP_ID" --parameters "{
-    \"name\": \"github-main\",
-    \"issuer\": \"https://token.actions.githubusercontent.com\",
-    \"subject\": \"repo:${GITHUB_REPO}:ref:refs/heads/main\",
-    \"audiences\": [\"api://AzureADTokenExchange\"]
-  }" -o none
-fi
-RG_ID="$(az group show -n "$RG" --query id -o tsv)"
-az role assignment create --assignee "$APP_ID" --role Contributor --scope "$RG_ID" -o none 2>/dev/null || true
+# --- 5. GitHub Actions -> Azure via OIDC (managed identity created by the Bicep) ---------------
+APP_ID="$(echo "$OUTPUTS" | python3 -c 'import sys,json;print(json.load(sys.stdin)["deployClientId"]["value"])')"
 
 say "Setting GitHub repository variables on ${GITHUB_REPO}"
 gh variable set AZURE_CLIENT_ID --repo "$GITHUB_REPO" --body "$APP_ID"

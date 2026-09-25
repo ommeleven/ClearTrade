@@ -33,6 +33,9 @@ param budgetAlertEmail string
 @description('First day of the current month (yyyy-MM-01), required by the budget resource.')
 param budgetStartDate string
 
+@description('GitHub repository (owner/name) allowed to deploy via OIDC.')
+param githubRepo string = 'ommeleven/ClearTrade'
+
 var suffix = uniqueString(resourceGroup().id)
 var hasDatabase = !empty(databaseConnectionString)
 
@@ -166,5 +169,34 @@ resource budget 'Microsoft.Consumption/budgets@2023-11-01' = {
   }
 }
 
+// GitHub Actions deploys with OIDC through this managed identity: no stored credentials, and no
+// app registration needed (useful in tenants where users cannot register applications).
+resource deployIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+  name: '${appName}-github-deploy'
+  location: location
+}
+
+resource githubFederation 'Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials@2023-01-31' = {
+  parent: deployIdentity
+  name: 'github-production'
+  properties: {
+    issuer: 'https://token.actions.githubusercontent.com'
+    subject: 'repo:${githubRepo}:environment:production'
+    audiences: ['api://AzureADTokenExchange']
+  }
+}
+
+var contributorRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b24988ac-6180-42a0-ab88-20f7382dd24c')
+
+resource deployContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(resourceGroup().id, deployIdentity.id, contributorRoleId)
+  properties: {
+    roleDefinitionId: contributorRoleId
+    principalId: deployIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+output deployClientId string = deployIdentity.properties.clientId
 output url string = 'https://${app.properties.configuration.ingress.fqdn}'
 output containerAppName string = app.name
