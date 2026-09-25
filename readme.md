@@ -1,269 +1,203 @@
-# ClearTrade
+# ClearTrade: Brokerage API
 
+[![CI/CD](https://github.com/ommeleven/ClearTrade/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/ommeleven/ClearTrade/actions/workflows/ci-cd.yml)
+[![Uptime](https://github.com/ommeleven/ClearTrade/actions/workflows/uptime.yml/badge.svg)](https://github.com/ommeleven/ClearTrade/actions/workflows/uptime.yml)
 
-A production-style fintech backend built with ASP.NET Core 8, demonstrating the architecture, patterns, and operational concerns of a real brokerage platform backend.
+A brokerage backend built with **.NET 10**, **PostgreSQL** and **Azure Container Apps**. It covers accounts, deposits and withdrawals, JWT auth, input validation, rate limiting and live usage metrics, and it ships through GitHub Actions on every merge.
+
+| | |
+|---|---|
+| **Live status and usage metrics** | https://cleartrade-api.gentlemeadow-d69bf54f.centralus.azurecontainerapps.io |
+| **Interactive API docs** | https://cleartrade-api.gentlemeadow-d69bf54f.centralus.azurecontainerapps.io/swagger |
+| **Raw metrics (JSON)** | https://cleartrade-api.gentlemeadow-d69bf54f.centralus.azurecontainerapps.io/api/stats |
+
+> The app scales to zero when idle so it runs at $0 a month. The first request after a quiet period takes a few seconds.
 
 ---
 
-## Overview
+## Try it in 60 seconds
 
-ClearTrade is a RESTful API that manages investment **accounts**, **holdings** (positions a client owns), and **trades** (buy/sell orders). It is deployed as a containerized service on Azure Container Apps, backed by a managed PostgreSQL database, and shipped via an automated CI/CD pipeline.
+1. Open **[Swagger](https://cleartrade-api.gentlemeadow-d69bf54f.centralus.azurecontainerapps.io/swagger)**.
+2. `POST /api/auth/login` with `{"username": "demo", "password": "Demo@12345"}`, or `POST /api/auth/register` to create your own user.
+3. Click **Authorize** and paste the `accessToken`.
+4. Try these requests:
 
-The project was built to demonstrate N-tier architecture, dependency injection, generic data access, JWT authentication, structured logging, rate limiting, background jobs, and distributed caching — the full stack of concerns a backend engineer handles in production.
+| Request | Result |
+|---|---|
+| `GET /api/accounts` | Your accounts |
+| `POST /api/accounts/A1/deposit` `{"amount": 100}` | 200, and the balance updates |
+| `POST /api/accounts/A1/withdraw` `{"amount": 1000000}` | **422**: insufficient funds (ProblemDetails) |
+| `POST /api/accounts/A1/deposit` `{"amount": -1.001}` | **400**: field-level validation errors |
+| `POST /api/accounts/A2/deposit` `{"amount": 1}` | **403**: not your account |
+| `POST /api/accounts` `{"ownerName": "Ada Lovelace", "initialDeposit": 50}` | **201**: new account |
 
-**Live API:** `https://brokerage-api.<region>.azurecontainerapps.io/swagger`
+Every call you make shows up on the [status page](https://cleartrade-api.gentlemeadow-d69bf54f.centralus.azurecontainerapps.io).
 
 ---
 
 ## Architecture
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│  Client (Swagger / HTTP)                                  │
-└────────────────────────┬─────────────────────────────────┘
-                         │ HTTPS
-┌────────────────────────▼─────────────────────────────────┐
-│  Azure Container Apps  (autoscaling: 1–3 replicas)       │
-│                                                           │
-│  ┌─────────────────────────────────────────────────────┐ │
-│  │  Rate Limiter  →  JWT Auth  →  Controllers          │ │
-│  │                              (API Layer)            │ │
-│  ├─────────────────────────────────────────────────────┤ │
-│  │  Services (Business Layer)  +  ILogger<T>           │ │
-│  ├───────────────────────┬─────────────────────────────┤ │
-│  │  Redis Cache           │  IRepository<T>            │ │
-│  │  (cache-aside)         │  EF Core → PostgreSQL      │ │
-│  └───────────────────────┴─────────────────────────────┘ │
-│                                                           │
-│  Background: PortfolioSnapshotJob (IHostedService)        │
-└──────────────────────────────────────────────────────────┘
-         │ image pull              │ managed DB
-┌────────▼──────────┐    ┌────────▼──────────────────────┐
-│ Azure Container   │    │ Azure Database for PostgreSQL  │
-│ Registry (ACR)    │    │ (Flexible Server)              │
-└───────────────────┘    └───────────────────────────────┘
+          Browser / Swagger / curl
+                    │ HTTPS
+┌───────────────────▼────────────────────────────────────────────┐
+│ Azure Container Apps (consumption, scale 0→1, TLS at ingress)  │
+│                                                                │
+│  Forwarded headers → usage tracking → ProblemDetails handler   │
+│  → rate limiter (per IP) → JWT auth → controllers              │
+│  → FluentValidation filter → services → IRepository<T>         │
+│                                             │                  │
+│  UsageFlushService (BackgroundService) ─────┤                  │
+└─────────────────────────────────────────────┼──────────────────┘
+        │ OpenTelemetry              EF Core 10 / Npgsql
+┌───────▼───────────────┐      ┌─────────────▼──────────────┐
+│ Application Insights  │      │ PostgreSQL                 │
+│ + Log Analytics       │      │ accounts · users ·         │
+└───────────────────────┘      │ usage_daily                │
+                               └────────────────────────────┘
+GitHub Actions: test (Testcontainers) → image (GHCR) → deploy (OIDC) → smoke test
+                hourly uptime probe
 ```
 
-### Project structure (N-tier)
+### Project structure
 
 ```
-BrokerageSolution/
-├── Brokerage.Api/          # Controllers, middleware, Program.cs — HTTP layer only
-├── Brokerage.Services/     # Business logic, background jobs — no HTTP dependencies
-├── Brokerage.Core/         # Models, interfaces, DTOs — no dependencies on anything
-├── Brokerage.Data/         # EF Core DbContext, repository implementations, migrations
-└── Brokerage.Tests/        # Unit tests (xUnit + Moq) + integration tests (WebApplicationFactory)
+Brokerage.Core/      Domain models, rules, exceptions, interfaces. No dependencies.
+Brokerage.Services/  Use cases (accounts, auth). Depends only on Core.
+Brokerage.Data/      EF Core DbContext, repositories, usage store, migrations.
+Brokerage.Api/       Controllers, validation, auth, rate limiting, metrics, status page.
+Brokerage.Tests/     Unit tests + integration tests against real PostgreSQL.
+infra/               Bicep for Azure (Container Apps, App Insights, budget alert).
+scripts/             provision.sh: one-command, idempotent environment setup.
 ```
 
-Dependencies flow **inward only**: Api → Services → Core ← Data. The Core layer has zero external dependencies — it is the contracts layer that every other layer references.
+Dependencies point inward: `Api → Services → Core ← Data`, and the API is the only place that wires up concrete implementations.
 
 ---
 
-## Features
+## What's implemented
 
-| Feature | Implementation |
+| Concern | Implementation |
 |---|---|
-| RESTful API | ASP.NET Core 8, `[ApiController]`, attribute routing |
-| N-tier architecture | 4-project solution with one-directional dependencies |
-| Dependency Injection | Built-in .NET DI container, constructor injection throughout |
-| Generic data access | `IRepository<T>` open-generic interface registered once for all entity types |
-| Database | Entity Framework Core 8 with PostgreSQL (Npgsql), code-first migrations |
-| Authentication | JWT bearer tokens, BCrypt password hashing, role-based authorization |
-| Rate limiting | ASP.NET Core built-in middleware — 100 req/min standard, 10 req/min on auth |
-| Structured logging | Serilog with compact JSON formatter, contextual fields per operation |
-| Background jobs | `BackgroundService` / `IHostedService` for scheduled portfolio snapshots |
-| Distributed cache | Redis via StackExchange.Redis, cache-aside pattern with TTL and write invalidation |
-| Containerization | Multi-stage Dockerfile, published to Azure Container Registry |
-| Cloud hosting | Azure Container Apps with autoscaling (1–3 replicas), managed PostgreSQL |
-| CI/CD | GitHub Actions — tests on every PR, build + push + deploy on merge to main |
-| Testing | xUnit unit tests (Moq fakes, no DB/HTTP), WebApplicationFactory integration tests |
-| API documentation | Swagger/OpenAPI via Swashbuckle, JWT auth support in Swagger UI |
+| **Domain rules** | `Account.Deposit/Withdraw` enforce positive amounts, a credit limit and a balance cap; insufficient funds returns 422 |
+| **Concurrency** | Optimistic concurrency on Postgres `xmin`: a lost update returns 409, and there's an integration test for it |
+| **Validation** | FluentValidation on every request DTO: amount > 0, ≤ 1,000,000, at most 2 decimals; name and credential rules |
+| **Errors** | RFC 7807 ProblemDetails everywhere (400, 401, 403, 404, 409, 422, 429, 500) with a `traceId`; no stack traces leak |
+| **Auth** | JWT bearer (HS256), BCrypt password hashing, `Client`/`Admin` roles, per-account ownership checks |
+| **Abuse protection** | Per-IP fixed-window rate limits: 100/min for the API, 10/min for `/api/auth` |
+| **Persistence** | EF Core 10 + PostgreSQL with migrations; an in-memory fallback when no connection string is set |
+| **Observability** | Serilog JSON logs, OpenTelemetry → Application Insights, `/health/live`, `/health/ready` (DB check) |
+| **Usage metrics** | Middleware counters and a p50/p95 latency window, flushed every 30s to `usage_daily` (an atomic upsert) so they survive restarts; served at `/api/stats` and `/` |
+| **Delivery** | Multi-stage non-root Docker image, GitHub Actions CI/CD, OIDC to Azure (no stored cloud credentials), post-deploy smoke test |
+| **Infrastructure** | Bicep: Container Apps, Log Analytics (0.1 GB/day cap), App Insights, and a $1 budget alert, costing **$0 a month** |
+| **Tests** | 42 xUnit tests: domain, service and validator unit tests, plus API integration tests on PostgreSQL via Testcontainers |
+
+Holdings, orders, the ledger, market data, caching and the rest are planned in **[PRODUCTION_ROADMAP.md](PRODUCTION_ROADMAP.md)**.
 
 ---
 
-## API Endpoints
+## API
 
-### Auth
-| Method | Path | Auth | Description |
+| Method | Route | Auth | Description |
 |---|---|---|---|
-| POST | `/api/auth/login` | None | Returns JWT token |
-
-### Accounts
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| GET | `/api/accounts` | Any | List all accounts |
-| GET | `/api/accounts/{id}` | Any | Get account by ID |
-| POST | `/api/accounts` | Any | Create account |
-| POST | `/api/accounts/{id}/deposit` | Client | Deposit funds |
-| POST | `/api/accounts/{id}/withdraw` | Client | Withdraw funds |
-| DELETE | `/api/accounts/{id}` | Admin | Delete account |
-
-### Holdings
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| GET | `/api/accounts/{id}/holdings` | Client | List positions for an account |
-
-### Trades
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| POST | `/api/trades` | Client | Place a buy/sell order |
-| GET | `/api/trades/{id}` | Client | Get trade by ID |
+| POST | `/api/auth/register` | none | Create a client user, returns a JWT |
+| POST | `/api/auth/login` | none | Exchange credentials for a JWT |
+| GET | `/api/accounts` | Client | List my accounts (admins see all) |
+| GET | `/api/accounts/{id}` | Client (owner) | Get one account |
+| POST | `/api/accounts` | Client | Open an account |
+| POST | `/api/accounts/{id}/deposit` | Client (owner) | Deposit `{ "amount": 100.00 }` |
+| POST | `/api/accounts/{id}/withdraw` | Client (owner) | Withdraw `{ "amount": 50.00 }` |
+| DELETE | `/api/accounts/{id}` | Admin | Close an account |
+| GET | `/api/stats` | none | Public usage metrics |
+| GET | `/health/live`, `/health/ready` | none | Liveness and readiness probes |
 
 ---
 
-## Getting Started
+## Run locally
 
-### Prerequisites
-
-- [.NET 8 SDK](https://dotnet.microsoft.com/download)
-- [Docker Desktop](https://www.docker.com/products/docker-desktop)
-- [PostgreSQL](https://www.postgresql.org/) or Docker (for local DB)
-
-### Run locally
+**Prerequisites:** the .NET 10 SDK. Docker is optional (needed for Postgres and the integration tests).
 
 ```bash
-# 1. Clone the repo
-git clone https://github.com/YOUR_USERNAME/BrokerageApi.git
-cd BrokerageApi
-
-# 2. Start PostgreSQL and Redis with Docker
-docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=brokerage --name pg postgres:16-alpine
-docker run -d -p 6379:6379 --name redis redis:alpine
-
-# 3. Set connection strings (or use appsettings.Development.json)
-export ConnectionStrings__BrokerageDb="Host=localhost;Port=5432;Database=brokerage;Username=postgres;Password=postgres"
-export ConnectionStrings__Redis="localhost:6379"
-export Jwt__Key="your-32-character-secret-key-here"
-
-# 4. Apply EF Core migrations
-cd Brokerage.Api
-dotnet ef database update --project ../Brokerage.Data --startup-project .
-
-# 5. Run
-dotnet run
-
-# 6. Open Swagger
-open https://localhost:5001/swagger
+# Zero setup: in-memory storage, http://localhost:5077
+dotnet run --project Brokerage.Api --launch-profile http
+open http://localhost:5077            # status page
+open http://localhost:5077/swagger    # API docs
 ```
 
-### Run tests
+**With PostgreSQL:**
 
 ```bash
-dotnet test
+docker run -d --name cleartrade-pg -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:16-alpine
+dotnet user-secrets --project Brokerage.Api set ConnectionStrings:BrokerageDb \
+  "Host=localhost;Database=brokerage;Username=postgres;Password=postgres"
+dotnet run --project Brokerage.Api --launch-profile http   # migrations run on startup
 ```
 
-### Run with Docker
+**Tests** (Docker must be running for the integration tests):
 
 ```bash
-# Build the image
-docker build -t brokerage-api -f Brokerage.Api/Dockerfile .
-
-# Run it (pointing at the local PostgreSQL container)
-docker run -p 8080:8080 \
-  -e ConnectionStrings__BrokerageDb="Host=host.docker.internal;Port=5432;Database=brokerage;Username=postgres;Password=postgres" \
-  -e Jwt__Key="your-32-character-secret-key-here" \
-  brokerage-api
+dotnet test Brokerage.slnx
 ```
+
+**Container:**
+
+```bash
+docker build -f Brokerage.Api/Dockerfile -t cleartrade-api .
+docker run -p 8080:8080 -e Jwt__Key="$(openssl rand -base64 48)" cleartrade-api
+```
+
+`dotnet tool restore` installs the pinned `dotnet-ef` for creating migrations:
+`dotnet ef migrations add <Name> -p Brokerage.Data -s Brokerage.Data -o Migrations`.
 
 ---
 
 ## Deployment
 
-The project deploys automatically on every push to `main` via GitHub Actions:
+| Piece | Choice | Cost |
+|---|---|---|
+| Compute | Azure Container Apps, consumption plan, min 0 / max 1 replicas | $0 (monthly free grant) |
+| Image | GitHub Container Registry, public | $0 |
+| Database | Neon serverless PostgreSQL (free tier), passed in as a Container Apps secret | $0 |
+| Telemetry | Application Insights + Log Analytics with a 0.1 GB/day cap | $0 (free allowance) |
+| Guardrail | Azure budget alert at $1 | $0 |
 
-1. **Test job** — `dotnet test` runs all unit and integration tests.
-2. **Deploy job** (runs only if tests pass, only on `main`) — builds the Docker image, pushes to Azure Container Registry tagged with the commit SHA, and updates the Azure Container App to use the new image.
-
-```
-push to main
-     │
-     ▼
-GitHub Actions
-     ├── dotnet test          ← fails fast if any test breaks
-     └── docker build & push  ← image tagged :latest and :<commit-sha>
-              │
-              ▼
-         Azure ACR
-              │
-              ▼
-     az containerapp update  ← Container App pulls the new image
-              │
-              ▼
-    Live in ~60 seconds
-```
-
-To deploy manually:
+**First-time setup** (with a personal Azure account, from a clean clone):
 
 ```bash
-# Build and tag
-docker build -t <acr>.azurecr.io/brokerage-api:<tag> -f Brokerage.Api/Dockerfile .
-
-# Push
-az acr login --name <acr>
-docker push <acr>.azurecr.io/brokerage-api:<tag>
-
-# Update the Container App
-az containerapp update \
-  --name brokerage-api \
-  --resource-group brokerage-rg \
-  --image <acr>.azurecr.io/brokerage-api:<tag>
+az login
+export DATABASE_URL='postgresql://user:pass@host/db?sslmode=require'   # optional
+./scripts/provision.sh
 ```
 
----
+The script:
+- Deploys `infra/main.bicep`.
+- Creates a GitHub OIDC federated identity scoped to the resource group.
+- Sets the repository variables.
+- Smoke-tests the URL.
 
-## Design Decisions
+After that, **every merge to `main`** does four things in order: it runs the tests, publishes `ghcr.io/ommeleven/cleartrade-api:<sha>`, rolls out a new revision, and checks that `/api/stats` reports the new commit.
 
-**Why N-tier over a flat structure?**
-Enforcing one-directional dependencies means business logic (Services) has no knowledge of HTTP or the database. The AccountService can be tested with a fake repository — no web server, no database — because it depends only on the IRepository<T> interface from Core.
+### Configuration
 
-**Why open-generic IRepository<T>?**
-Registering `typeof(IRepository<>)` → `typeof(EfRepository<>)` once in DI means every entity type gets a full-featured data-access implementation without any per-entity boilerplate. Swapping from in-memory to EF Core required changing one registration line and nothing else.
-
-**Why cache-aside over read-through?**
-Cache-aside keeps the caching concern in the service layer where the business logic is, rather than hiding it behind the repository. This makes cache behavior visible, testable, and controllable — you can skip the cache for specific operations (e.g. a trade that requires the freshest balance).
-
-**Why Redis for caching instead of in-memory?**
-An in-memory cache is local to one replica. With autoscaling (1–3 replicas), each replica would have a different cache state. Redis is a shared distributed cache — all replicas read and write to the same store, giving consistent behavior under load.
-
-**Why JWT over sessions?**
-Sessions require server-side state, which breaks horizontal scaling — a request routed to replica 2 doesn't have the session created on replica 1. JWTs are stateless: the token is self-contained and any replica can validate it with the shared signing key.
-
----
-
-## Configuration
-
-All secrets are injected as environment variables at runtime — never baked into the image.
-
-| Key | Description |
-|---|---|
-| `ConnectionStrings__BrokerageDb` | PostgreSQL connection string |
-| `ConnectionStrings__Redis` | Redis connection string |
-| `Jwt__Key` | HS256 signing key (min 32 chars) |
-| `Jwt__Issuer` | JWT issuer claim |
-| `Jwt__Audience` | JWT audience claim |
-| `Jwt__ExpiresMinutes` | Token lifetime in minutes |
-
-In Azure Container Apps, these are set as environment variables on the container. Sensitive values should be stored in Azure Key Vault and referenced via Container Apps secrets.
+| Setting | Env var | Notes |
+|---|---|---|
+| `ConnectionStrings:BrokerageDb` | `ConnectionStrings__BrokerageDb` | Empty means in-memory mode |
+| `Jwt:Key` | `Jwt__Key` | Required outside Development, at least 32 characters |
+| `Jwt:Issuer` / `Audience` / `ExpiresMinutes` | `Jwt__…` | Defaults: `cleartrade-api`, `cleartrade-clients`, 60 |
+| `Seed:AdminPassword` | `Seed__AdminPassword` | Creates the `admin` user when set |
+| `RateLimiting:GlobalPermitPerMinute` / `AuthPermitPerMinute` | `RateLimiting__…` | 100 / 10 |
+| `Database:MigrateOnStartup` | `Database__MigrateOnStartup` | Default `true` |
+| App Insights | `APPLICATIONINSIGHTS_CONNECTION_STRING` | Telemetry is enabled when set |
 
 ---
 
-## Tech Stack
+## Design decisions
 
-| Layer | Technology |
-|---|---|
-| Language | C# 12 / .NET 8 |
-| Web framework | ASP.NET Core 8 |
-| ORM | Entity Framework Core 8 |
-| Database | PostgreSQL 16 (Azure Flexible Server) |
-| Cache | Redis 7 (StackExchange.Redis) |
-| Logging | Serilog (structured JSON) |
-| Auth | JWT bearer (Microsoft.AspNetCore.Authentication.JwtBearer) |
-| Testing | xUnit, Moq, FluentAssertions, WebApplicationFactory |
-| Containerization | Docker (multi-stage build) |
-| Registry | Azure Container Registry |
-| Hosting | Azure Container Apps |
-| CI/CD | GitHub Actions |
-| API docs | Swagger / Swashbuckle |
+- **Why generic repositories?** `IRepository<T>` has an in-memory and an EF Core implementation, registered as open generics. The services are unit-tested without a database, and the API runs with zero setup.
+- **Why is concurrency on `xmin`?** It's Postgres's built-in row version, so there's no extra column, and EF Core turns a stale write into `DbUpdateConcurrencyException`, which becomes a 409.
+- **Why persist metrics to the DB instead of only App Insights?** The public status page must be visible without Azure access and must survive scale-to-zero. Counters are batched in memory and upserted every 30s, so each request costs no database round trip.
+- **Why Container Apps?** Scale-to-zero, revisions and managed TLS without running a cluster. That's the cheapest credible way to run a container on Azure.
+- **Why is money a plain decimal balance?** It's a deliberate MVP shortcut. The roadmap replaces it with a double-entry ledger and idempotency keys.
 
 ---
 
