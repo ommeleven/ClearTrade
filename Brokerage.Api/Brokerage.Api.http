@@ -1,6 +1,36 @@
-@Brokerage.Api_HostAddress = http://localhost:5077
+@host = http://localhost:5077
 
-GET {{Brokerage.Api_HostAddress}}/weatherforecast/
-Accept: application/json
+### Public usage metrics
+GET {{host}}/api/stats
 
-###
+### Log in as the demo user
+# @name login
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{ "username": "demo", "password": "Demo@12345" }
+
+### My accounts
+GET {{host}}/api/accounts
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+### Deposit
+POST {{host}}/api/accounts/A1/deposit
+Authorization: Bearer {{login.response.body.$.accessToken}}
+Content-Type: application/json
+
+{ "amount": 250.00 }
+
+### Withdraw more than available (422)
+POST {{host}}/api/accounts/A1/withdraw
+Authorization: Bearer {{login.response.body.$.accessToken}}
+Content-Type: application/json
+
+{ "amount": 999999 }
+
+### Invalid amount (400)
+POST {{host}}/api/accounts/A1/deposit
+Authorization: Bearer {{login.response.body.$.accessToken}}
+Content-Type: application/json
+
+{ "amount": -5.123 }

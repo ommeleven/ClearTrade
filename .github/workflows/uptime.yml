@@ -1,0 +1,30 @@
+name: Uptime check
+
+# Hourly probe of the live demo. Hourly (not more often) because every probe wakes the
+# scale-to-zero app, and the Container Apps free grant should cover real visitors first.
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    if: vars.LIVE_URL != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe /health/ready (allows for a cold start)
+        run: |
+          for i in $(seq 1 6); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "${{ vars.LIVE_URL }}/health/ready" || true)
+            t=$(curl -s -o /dev/null -w "%{time_total}" --max-time 30 "${{ vars.LIVE_URL }}/health/ready" || true)
+            if [ "$code" = "200" ]; then
+              echo "### ✅ Up — ${{ vars.LIVE_URL }} responded 200 in ${t}s" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "### ❌ Down — last status: $code" >> "$GITHUB_STEP_SUMMARY"
+          exit 1
