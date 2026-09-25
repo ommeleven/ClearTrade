@@ -5,6 +5,7 @@
 # Usage:
 #   az login                                   # your personal account
 #   export DATABASE_URL='postgresql://user:pass@host/db?sslmode=require'   # optional (e.g. Neon free tier)
+#   (or put DATABASE_URL=... in .azure-secrets.env, which is git-ignored)
 #   ./scripts/provision.sh
 #
 # Optional env: LOCATION (default eastus), RG (default rg-cleartrade), IMAGE, GITHUB_REPO, BUDGET_EMAIL
@@ -45,10 +46,12 @@ curl -fsS -o /dev/null -H "Authorization: Bearer ${TOKEN}" \
   || die "${IMAGE} is not publicly pullable. Let CI publish it, then set the package visibility to Public at https://github.com/users/${GITHUB_REPO%%/*}/packages/container/package/${REPO_PATH#*/}/settings"
 
 # --- 3. Secrets (generated once, stored locally in a git-ignored file) --------------------------
+ENV_DATABASE_URL="${DATABASE_URL:-}"   # an exported value wins over the saved one
 [[ -f "$SECRETS_FILE" ]] && source "$SECRETS_FILE"
+DATABASE_URL="${ENV_DATABASE_URL:-${DATABASE_URL:-}}"
 JWT_KEY="${JWT_KEY:-$(openssl rand -base64 48 | tr -d '\n')}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-$(openssl rand -base64 18 | tr -d '\n/+=')A1!}"
-printf 'JWT_KEY=%q\nADMIN_PASSWORD=%q\n' "$JWT_KEY" "$ADMIN_PASSWORD" > "$SECRETS_FILE"
+printf 'JWT_KEY=%q\nADMIN_PASSWORD=%q\nDATABASE_URL=%q\n' "$JWT_KEY" "$ADMIN_PASSWORD" "${DATABASE_URL:-}" > "$SECRETS_FILE"
 chmod 600 "$SECRETS_FILE"
 
 # Npgsql needs key/value syntax; accept the postgres:// URI that Neon/Supabase hand out.
