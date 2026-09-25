@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ClearTrade Status</title>
+  <meta name="description" content="Live status and usage metrics for the ClearTrade brokerage API.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230f766e'/%3E%3Cpath d='M8 20l5-5 4 4 7-8' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <style>
+    :root {
+      --bg: #f7f7f5; --surface: #ffffff; --border: #e4e4e0; --text: #1c1c1a; --muted: #6b6b66;
+      --accent: #0f766e; --accent-soft: #ccfbf1; --ok: #15803d; --ok-soft: #dcfce7; --bad: #b91c1c; --bad-soft: #fee2e2;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #111110; --surface: #1b1b19; --border: #2e2e2b; --text: #ededea; --muted: #9a9a93;
+        --accent: #2dd4bf; --accent-soft: #123b37; --ok: #4ade80; --ok-soft: #14301d; --bad: #f87171; --bad-soft: #3b1414;
+      }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    main { max-width: 960px; margin: 0 auto; padding: 32px 16px 48px; }
+    header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+    h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; }
+    .sub { color: var(--muted); margin: 2px 0 0; }
+    .pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; font-weight: 600; font-size: 13px; background: var(--border); color: var(--muted); }
+    .pill.ok { background: var(--ok-soft); color: var(--ok); }
+    .pill.bad { background: var(--bad-soft); color: var(--bad); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+    .pill.ok .dot { animation: pulse 2s infinite; }
+    @keyframes pulse { 50% { opacity: .35; } }
+    @media (prefers-reduced-motion: reduce) { .pill.ok .dot { animation: none; } }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+    .kpi .label { color: var(--muted); font-size: 13px; }
+    .kpi .value { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; margin-top: 4px; }
+    .kpi .hint { color: var(--muted); font-size: 12px; }
+    section { margin-top: 20px; }
+    h2 { font-size: 15px; margin: 0 0 12px; }
+    .chart-card { padding-bottom: 8px; }
+    svg { display: block; width: 100%; height: auto; }
+    .bar { fill: var(--accent); }
+    .bar.today { fill: var(--accent); opacity: .6; }
+    .axis { fill: var(--muted); font-size: 11px; }
+    .barval { fill: var(--text); font-size: 11px; font-variant-numeric: tabular-nums; }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+    dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0; }
+    dt { color: var(--muted); }
+    dd { margin: 0; font-family: var(--mono); font-size: 13px; overflow-wrap: anywhere; }
+    code { font-family: var(--mono); font-size: 13px; background: var(--accent-soft); padding: 1px 6px; border-radius: 4px; }
+    ol { margin: 0; padding-left: 20px; }
+    ol li { margin-bottom: 6px; }
+    a { color: var(--accent); }
+    .links { display: flex; flex-wrap: wrap; gap: 8px; }
+    .btn { display: inline-block; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); text-decoration: none; font-weight: 550; }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+    footer { margin-top: 28px; color: var(--muted); font-size: 12px; }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>ClearTrade Brokerage API</h1>
+      <p class="sub">Live usage metrics from the running production deployment</p>
+    </div>
+    <span id="health" class="pill"><span class="dot"></span><span id="health-text">Checking…</span></span>
+  </header>
+
+  <div class="grid" id="kpis">
+    <div class="card kpi"><div class="label">API requests</div><div class="value" data-k="requests">—</div><div class="hint">all time</div></div>
+    <div class="card kpi"><div class="label">Transactions</div><div class="value" data-k="transactions">—</div><div class="hint">deposits + withdrawals</div></div>
+    <div class="card kpi"><div class="label">Volume moved</div><div class="value" data-k="volume">—</div><div class="hint">demo currency</div></div>
+    <div class="card kpi"><div class="label">Users · Accounts</div><div class="value" data-k="users">—</div><div class="hint">registered · open</div></div>
+    <div class="card kpi"><div class="label">p95 latency</div><div class="value" data-k="p95">—</div><div class="hint" data-k="p95hint">this instance</div></div>
+    <div class="card kpi"><div class="label">Server error rate</div><div class="value" data-k="errors">—</div><div class="hint">5xx / requests</div></div>
+  </div>
+
+  <section class="card chart-card">
+    <h2>Requests per day (last 7 days, UTC)</h2>
+    <svg id="chart" viewBox="0 0 700 180" role="img" aria-label="Requests per day for the last 7 days"></svg>
+  </section>
+
+  <section class="two">
+    <div class="card">
+      <h2>Try it in 60 seconds</h2>
+      <ol>
+        <li>Open <a href="/swagger">Swagger</a>.</li>
+        <li><code>POST /api/auth/login</code> with <code>demo</code> / <code>Demo@12345</code> (or register your own user).</li>
+        <li>Click <b>Authorize</b> and paste the <code>accessToken</code>.</li>
+        <li><code>POST /api/accounts/A1/deposit</code> with <code>{"amount": 100}</code>. Then try a negative amount, an overdraft, or account <code>A2</code> to see validation, 422 and 403 responses.</li>
+      </ol>
+      <div class="links" style="margin-top:12px">
+        <a class="btn primary" href="/swagger">Open API docs</a>
+        <a class="btn" href="/api/stats">Raw metrics JSON</a>
+        <a class="btn" href="https://github.com/ommeleven/ClearTrade">Source on GitHub</a>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Deployment</h2>
+      <dl>
+        <dt>Version</dt><dd data-k="version">—</dd>
+        <dt>Commit</dt><dd data-k="commit">—</dd>
+        <dt>Environment</dt><dd data-k="env">—</dd>
+        <dt>Instance up</dt><dd data-k="uptime">—</dd>
+        <dt>Stack</dt><dd>.NET 10 · EF Core · PostgreSQL · Azure Container Apps</dd>
+        <dt>Updated</dt><dd data-k="updated">—</dd>
+      </dl>
+    </div>
+  </section>
+
+  <footer>Metrics refresh every 15 seconds. The API scales to zero when idle, so the first request after a quiet period can take a few seconds.</footer>
+</main>
+
+<script>
+  const nf = new Intl.NumberFormat('en-US');
+  const cf = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 });
+  const set = (k, v) => document.querySelectorAll(`[data-k="${k}"]`).forEach(el => el.textContent = v);
+
+  function duration(s) {
+    const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
+    return d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m ${s % 60}s`;
+  }
+
+  function drawChart(days) {
+    const svg = document.getElementById('chart');
+    const W = 700, H = 180, top = 20, bottom = 24, gap = 14;
+    const max = Math.max(1, ...days.map(d => d.requests));
+    const bw = (W - gap * (days.length - 1)) / days.length;
+    svg.innerHTML = days.map((d, i) => {
+      const h = Math.max(2, (H - top - bottom) * d.requests / max);
+      const x = i * (bw + gap), y = H - bottom - h;
+      const label = new Date(d.date + 'T00:00:00Z').toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' });
+      const today = i === days.length - 1 ? ' today' : '';
+      return `<rect class="bar${today}" x="${x}" y="${y}" width="${bw}" height="${h}" rx="4"><title>${d.date}: ${nf.format(d.requests)} requests, ${nf.format(d.transactions)} transactions</title></rect>
+              <text class="barval" x="${x + bw / 2}" y="${y - 6}" text-anchor="middle">${cf.format(d.requests)}</text>
+              <text class="axis" x="${x + bw / 2}" y="${H - 6}" text-anchor="middle">${today ? 'Today' : label}</text>`;
+    }).join('');
+  }
+
+  async function refresh() {
+    const health = document.getElementById('health');
+    try {
+      const [h, s] = await Promise.all([
+        fetch('/health/ready', { cache: 'no-store' }),
+        fetch('/api/stats', { cache: 'no-store' }).then(r => r.json()),
+      ]);
+      health.className = 'pill ' + (h.ok ? 'ok' : 'bad');
+      document.getElementById('health-text').textContent = h.ok ? 'Operational' : 'Degraded';
+
+      const t = s.totals;
+      set('requests', nf.format(t.requests));
+      set('transactions', nf.format(t.deposits + t.withdrawals));
+      set('volume', cf.format(t.volumeMoved));
+      set('users', `${nf.format(t.users)} · ${nf.format(t.accounts)}`);
+      set('p95', s.instance.latency.p95Ms != null ? `${s.instance.latency.p95Ms} ms` : '—');
+      set('p95hint', `this instance · ${nf.format(s.instance.latency.sampleSize)} samples`);
+      set('errors', t.requests ? `${(100 * t.serverErrors / t.requests).toFixed(2)}%` : '0%');
+      set('version', s.version);
+      set('commit', s.commit ?? 'local');
+      set('env', s.environment);
+      set('uptime', duration(s.instance.uptimeSeconds));
+      set('updated', new Date(s.generatedAt).toLocaleTimeString());
+      drawChart(s.last7Days);
+    } catch {
+      health.className = 'pill bad';
+      document.getElementById('health-text').textContent = 'Unreachable';
+    }
+  }
+
+  refresh();
+  setInterval(refresh, 15000);
+</script>
+</body>
+</html>
