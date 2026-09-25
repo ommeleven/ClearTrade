@@ -1,2 +1,11 @@
 <Solution>
+  <Folder Name="/src/">
+    <Project Path="Brokerage.Api/Brokerage.Api.csproj" />
+    <Project Path="Brokerage.Core/Brokerage.Core.csproj" />
+    <Project Path="Brokerage.Data/Brokerage.Data.csproj" />
+    <Project Path="Brokerage.Services/Brokerage.Services.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="Brokerage.Tests/Brokerage.Tests.csproj" />
+  </Folder>
 </Solution>
